@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heart-risk-mlops"
+version = "1.0.0"
+description = "Heart disease risk classifier with an end-to-end MLOps pipeline"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = ["slow: end-to-end training test (MLflow)"]
+filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["mlruns"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "N"]
+# X / X_train are the standard ML naming convention; zip strictness not needed here.
+ignore = ["N803", "N806", "B905"]
+
+[tool.ruff.lint.per-file-ignores]
+"notebooks/*.ipynb" = ["B018", "E501"]

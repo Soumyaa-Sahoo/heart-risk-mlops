@@ -1,0 +1,21 @@
+# Optional alternative to the LoadBalancer. Requires an NGINX ingress controller:
+#   minikube addons enable ingress
+# then add "<minikube ip>  heart-risk.local" to /etc/hosts.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: heart-api
+  namespace: heart-risk
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: heart-risk.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: heart-api
+                port:
+                  name: http

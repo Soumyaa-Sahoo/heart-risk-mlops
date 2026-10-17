@@ -1,0 +1,32 @@
+# Local monitoring stack: API + Prometheus + Grafana
+#   docker compose up --build -d
+#   API        http://localhost:8000/docs
+#   Prometheus http://localhost:9090
+#   Grafana    http://localhost:3000  (admin / admin)
+services:
+  api:
+    build: .
+    image: heart-risk-api:latest
+    ports: ["8000:8000"]
+    environment:
+      LOG_LEVEL: INFO
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["9090:9090"]
+    depends_on: [api]
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    depends_on: [prometheus]

@@ -1,0 +1,155 @@
+name: ci-cd
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      n_iter:
+        description: "Hyper-parameter configurations per model"
+        default: "30"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  # Quality gate: the pipeline fails if the selected model is worse than this.
+  MIN_CV_ROC_AUC: "0.80"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install ruff==0.7.4
+      - name: Ruff lint
+        run: ruff check . --output-format=github
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install (clean environment from requirements files)
+        run: pip install -r requirements-dev.txt
+      - name: Unit + integration tests
+        run: |
+          pytest --junitxml=test-results/junit.xml \
+                 --cov=heart --cov=api --cov-report=xml:test-results/coverage.xml \
+                 --cov-report=term-missing
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+
+  train:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements.txt
+      - name: Prepare data (use committed CSV, download only if missing)
+        run: |
+          if [ ! -f data/processed/heart_clean.csv ]; then python -m heart.data; fi
+          wc -l data/processed/heart_clean.csv
+      - name: EDA figures
+        run: python -m heart.eda
+      - name: Train, tune and track with MLflow
+        run: python -m heart.train --n-iter "${{ github.event.inputs.n_iter || '30' }}" 2>&1 | tee train.log
+      - name: Quality gate
+        run: |
+          python - <<'PY'
+          import json, os, sys
+          meta = json.load(open("models/metadata.json"))
+          auc = meta["cv_metrics"]["cv_roc_auc_mean"]
+          gate = float(os.environ["MIN_CV_ROC_AUC"])
+          print(f"Selected {meta['model_name']} [{meta['feature_set']}]: "
+                f"CV ROC-AUC {auc:.3f} (gate {gate})")
+          sys.exit(0 if auc >= gate else 1)
+          PY
+      - name: Job summary
+        if: always()
+        run: |
+          echo "## Training results (3 models x 3 feature sets)" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f models/metadata.json ]; then
+            python -c "import json; m=json.load(open('models/metadata.json')); print(f\"**Selected:** {m['model_name']} / {m['feature_set']}, threshold {m['decision_threshold']}  \n**Rule:** {m['selection_rule']}\n\")" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f reports/model_comparison.csv ]; then
+            python - >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import pandas as pd
+          df = pd.read_csv("reports/model_comparison.csv")
+          wanted = ["model", "feature_set", "cv_roc_auc_mean", "cv_roc_auc_std", "cv_recall_mean",
+                    "oof_brier", "oof_recall_female", "oof_recall_male", "latency_ms",
+                    "test_roc_auc"]
+          cols = [c for c in wanted if c in df.columns]
+          df = df[cols].round(3)
+          print("| " + " | ".join(cols) + " |")
+          print("|" + "---|" * len(cols))
+          for row in df.itertuples(index=False):
+              print("| " + " | ".join(str(v) for v in row) + " |")
+          PY
+          fi
+      - name: Upload model
+        uses: actions/upload-artifact@v4
+        with:
+          name: model
+          path: models/
+      - name: Upload reports, plots, MLflow runs and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-reports
+          path: |
+            reports/
+            mlruns/
+            train.log
+
+  docker:
+    needs: train
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: model
+          path: models/
+      - name: Build image
+        run: docker build -t heart-risk-api:${{ github.sha }} -t heart-risk-api:latest .
+      - name: Run container and smoke test
+        run: |
+          docker run -d --name heart-api -p 8000:8000 heart-risk-api:latest
+          bash scripts/smoke_test.sh http://localhost:8000
+      - name: Container logs
+        if: always()
+        run: docker logs heart-api || true
+      - name: Push to GHCR (main branch only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE=ghcr.io/${OWNER}/heart-risk-api
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag heart-risk-api:latest ${IMAGE}:${{ github.sha }}
+          docker tag heart-risk-api:latest ${IMAGE}:latest
+          docker push ${IMAGE}:${{ github.sha }}
+          docker push ${IMAGE}:latest

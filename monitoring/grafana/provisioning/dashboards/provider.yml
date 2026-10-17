@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: heart-api
+    folder: Heart Risk
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

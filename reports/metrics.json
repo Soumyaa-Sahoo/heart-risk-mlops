@@ -1,0 +1,48 @@
+{
+  "logistic_regression__raw": {
+    "cv_roc_auc": 0.91029075594293,
+    "test_roc_auc": 0.95995670995671,
+    "oof_brier": 0.12748677378650958
+  },
+  "random_forest__raw": {
+    "cv_roc_auc": 0.9022409152843937,
+    "test_roc_auc": 0.9556277056277057,
+    "oof_brier": 0.13998346972487233
+  },
+  "hist_gradient_boosting__raw": {
+    "cv_roc_auc": 0.8911033411033411,
+    "test_roc_auc": 0.9545454545454546,
+    "oof_brier": 0.13400260226803776
+  },
+  "logistic_regression__ratio": {
+    "cv_roc_auc": 0.9092615114354246,
+    "test_roc_auc": 0.9577922077922079,
+    "oof_brier": 0.1275331846646102
+  },
+  "random_forest__ratio": {
+    "cv_roc_auc": 0.9013541209193383,
+    "test_roc_auc": 0.9534632034632036,
+    "oof_brier": 0.13706144463139802
+  },
+  "hist_gradient_boosting__ratio": {
+    "cv_roc_auc": 0.8954480704480703,
+    "test_roc_auc": 0.9545454545454546,
+    "oof_brier": 0.13701987132058546
+  },
+  "logistic_regression__clinical": {
+    "cv_roc_auc": 0.9068314133531526,
+    "test_roc_auc": 0.958874458874459,
+    "oof_brier": 0.12930535340996913
+  },
+  "random_forest__clinical": {
+    "cv_roc_auc": 0.8995304212695517,
+    "test_roc_auc": 0.9567099567099566,
+    "oof_brier": 0.14188238405430395
+  },
+  "hist_gradient_boosting__clinical": {
+    "cv_roc_auc": 0.8954480704480703,
+    "test_roc_auc": 0.9545454545454546,
+    "oof_brier": 0.13701987132058546
+  },
+  "selected": "logistic_regression__raw"
+}

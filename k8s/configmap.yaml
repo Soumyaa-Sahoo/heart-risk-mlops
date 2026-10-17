@@ -1,0 +1,12 @@
+# Non-secret runtime configuration, injected into the API pods as env vars.
+# Change a value, `kubectl apply -f k8s/configmap.yaml`, then
+# `kubectl -n heart-risk rollout restart deployment/heart-api`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: heart-api-config
+  namespace: heart-risk
+data:
+  LOG_LEVEL: "INFO"
+  MODEL_PATH: "/app/models/model.joblib"
+  METADATA_PATH: "/app/models/metadata.json"

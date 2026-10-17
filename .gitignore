@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+.ipynb_checkpoints/
+
+# raw downloads are reproducible via `python -m heart.data`; the cleaned CSV is committed
+data/raw/*
+!data/raw/.gitkeep
+
+# experiment tracking + generated model artefacts (produced by CI / `make train`)
+mlruns/
+mlartifacts/
+models/*
+!models/.gitkeep
